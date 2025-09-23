@@ -25,12 +25,8 @@ def ask_sms_code_text() -> str:
     return "Введите код из СМС:"
 
 
-def ask_email_text() -> str:
-    return "Введите адрес e-mail, привязанный к аккаунту WB Partner:"
-
-
 def ask_email_code_text() -> str:
-    return "Введите код из письма на e-mail:"
+    return "Введите код с e-mail:"
 
 
 def auth_success_text() -> str:
