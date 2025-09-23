@@ -1,21 +1,9 @@
-# Python
 __pycache__/
 *.py[cod]
-*.egg-info/
+*.sqlite3
+*.db
+*.log
 .venv/
-venv/
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-
-# IDE
-.idea/
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Secrets
 .env
 .env.*
-!.env.example
+data/
