@@ -9,6 +9,7 @@ load_dotenv()
 class Settings:
     bot_token: str = os.getenv("BOT_TOKEN", "")
     wb_base_url: str = os.getenv("WB_BASE_URL", "https://example.wb-partner.ru")
+    wb_partner_url: str = os.getenv("WB_PARTNER_URL", "https://seller.wildberries.ru/")
 
 
 def _build_settings() -> Settings:
