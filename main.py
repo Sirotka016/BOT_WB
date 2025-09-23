@@ -33,10 +33,10 @@ def kb_home() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="Авторизация", callback_data="auth"),
-                InlineKeyboardButton(text="Обновить", callback_data="refresh"),
+                InlineKeyboardButton(text="🔑 Авторизация", callback_data="auth"),
+                InlineKeyboardButton(text="🔄 Обновить", callback_data="refresh"),
             ],
-            [InlineKeyboardButton(text="Закрыть", callback_data="close")],
+            [InlineKeyboardButton(text="❌ Закрыть", callback_data="close")],
         ]
     )
 
@@ -46,7 +46,7 @@ def kb_auth() -> InlineKeyboardMarkup:
         inline_keyboard=[
             [
                 InlineKeyboardButton(text="🏠 Домой", callback_data="home"),
-                InlineKeyboardButton(text="Закрыть", callback_data="close"),
+                InlineKeyboardButton(text="❌ Закрыть", callback_data="close"),
             ]
         ]
     )
@@ -65,8 +65,8 @@ def home_text(user_name: str) -> str:
 def auth_stub_text() -> str:
     # Текст заглушки авторизации — как на скрине
     return (
-        "✅ Телефон не заполнен\n"
-        "✅ Авторизация не пройдена\n"
+        "❌ Телефон не заполнен\n"
+        "❌ Авторизация не пройдена\n"
         "____________________________\n"
         "Для продолжения нужно отправить номер телефона в формате +79181234567, "
         "который используется для входа на портал WB Партнеры"
