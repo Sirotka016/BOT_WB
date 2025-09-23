@@ -1,5 +1,5 @@
-from ..settings import settings
 from ..storage.repo import UserRepo
+from ..settings import settings
 from .wb_browser import WBBrowser
 
 
@@ -19,9 +19,6 @@ class AuthService:
 
     async def submit_sms(self, tg_user_id: int, code: str):
         await self.browser.fill_sms_code(tg_user_id, code)
-
-    async def submit_email(self, tg_user_id: int, email: str):
-        await self.browser.fill_email(tg_user_id, email)
 
     async def submit_email_code(self, tg_user_id: int, code: str):
         await self.browser.fill_email_code(tg_user_id, code)
