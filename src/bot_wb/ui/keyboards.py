@@ -1,13 +1,16 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 
-def kb_home() -> InlineKeyboardMarkup:
+def kb_home(authorized: bool) -> InlineKeyboardMarkup:
+    row1 = []
+    if authorized:
+        row1.append(InlineKeyboardButton(text="👤 Профиль", callback_data="profile"))
+    else:
+        row1.append(InlineKeyboardButton(text="🔑 Авторизация", callback_data="auth"))
+    row1.append(InlineKeyboardButton(text="🔄 Обновить", callback_data="refresh"))
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [
-                InlineKeyboardButton(text="🔑 Авторизация", callback_data="auth"),
-                InlineKeyboardButton(text="🔄 Обновить", callback_data="refresh"),
-            ],
+            row1,
             [InlineKeyboardButton(text="❌ Закрыть", callback_data="close")],
         ]
     )
@@ -24,7 +27,7 @@ def kb_auth_stub() -> InlineKeyboardMarkup:
     )
 
 
-def kb_logout() -> InlineKeyboardMarkup:
+def kb_profile() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="🚪 Выйти из аккаунта", callback_data="logout")],
