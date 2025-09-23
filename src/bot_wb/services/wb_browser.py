@@ -1,4 +1,5 @@
 import asyncio
+import re
 from pathlib import Path
 from typing import Optional
 
@@ -10,6 +11,7 @@ from playwright.async_api import (
     Page,
     Route,
     Request,
+    TimeoutError as PWTimeoutError,
 )
 
 # Каталоги для контекстов и storage_state
@@ -31,6 +33,50 @@ BLOCKED_URL_PARTS = (
     "gtm.js",
     "analytics.js",
 )
+
+PHONE_INPUT_SEL = "input[type='tel'], input[name='phone'], input[placeholder*='999 999-99-99']"
+SMS_CODE_INPUTS_SEL = "input[autocomplete='one-time-code'], input[name^='code'], input[data-test*='code']"
+EMAIL_INPUT_SEL = "input[type='email'], input[name='email']"
+SUBMIT_BTN_SEL = "button[type='submit'], button:has-text('Получить код'), button:has-text('Продолжить'), [data-qa='sendPhone'], [data-qa='sendEmail']"
+
+
+def _normalize_phone_for_ru_mask(phone: str) -> str:
+    """
+    Преобразует ввод пользователя к формату, который ожидает поле с маской '+7 999 999-99-99':
+    - если пришло '+7XXXXXXXXXX' -> 'XXXXXXXXXX'
+    - если пришло '8XXXXXXXXXX'  -> 'XXXXXXXXXX'
+    - если пришло 'XXXXXXXXXX'   -> 'XXXXXXXXXX'
+    Возвращает ровно 10 цифр или ''.
+    """
+
+    digits = re.sub(r"\D", "", phone)
+    if digits.startswith("7") and len(digits) == 11:
+        digits = digits[1:]
+    elif digits.startswith("8") and len(digits) == 11:
+        digits = digits[1:]
+    # если ввели сразу 10 цифр — оставляем как есть
+    return digits if len(digits) == 10 else ""
+
+
+async def _fill_code_inputs(page: Page, code: str):
+    """
+    Универсальная функция для 4-значных (или n-значных) кодов из отдельных инпутов.
+    Если на странице один инпут — просто печатаем туда весь код.
+    """
+
+    digits = re.sub(r"\D", "", code)
+    inputs = await page.query_selector_all(SMS_CODE_INPUTS_SEL)
+    if inputs and len(inputs) in (4, 5, 6) and len(digits) >= len(inputs):
+        for i, ch in enumerate(digits[: len(inputs)]):
+            await inputs[i].fill(ch)
+        return True
+    # одиночное поле — пробуем найти наиболее вероятный инпут
+    single_sel = "input[name='code'], input[maxlength='4'], input[ maxlength='4' ], input[type='text'][maxlength], input[type='tel']"
+    el = await page.query_selector(single_sel)
+    if el:
+        await el.fill(digits)
+        return True
+    return False
 
 
 def _should_block(req: Request) -> bool:
@@ -127,6 +173,12 @@ class WBBrowser:
     async def open_partner(self, tg_user_id: int):
         page = await self.get_page(tg_user_id)
         await page.goto(self.base_url, wait_until="domcontentloaded")
+        # на всякий случай переключимся на русский, если есть селектор языка
+        try:
+            await page.wait_for_timeout(100)
+            # необязательно; оставляем как no-op, если элемента нет
+        except Exception:
+            pass
 
     async def is_logged_in(self, tg_user_id: int) -> bool:
         """
@@ -145,58 +197,70 @@ class WBBrowser:
     # ---------- Шаги авторизации ----------
 
     async def fill_phone(self, tg_user_id: int, phone: str):
+        """
+        На стартовом экране уже проставлено '+7', поэтому вводим только 10 цифр локального номера.
+        """
+
         page = await self.get_page(tg_user_id)
-        await page.goto(self.base_url, wait_until="domcontentloaded")
+        # гарантируем, что мы на странице входа (если пользователь нажал 'Авторизация' не с первого раза)
+        if page.url.rstrip("/") != self.base_url.rstrip("/"):
+            await page.goto(self.base_url, wait_until="domcontentloaded")
 
-        phone_input_sel = "input[type='tel'], input[name='phone']"
-        submit_phone_sel = (
-            "button[type='submit'], button:has-text('Получить код'), [data-qa='sendPhone']"
-        )
+        local10 = _normalize_phone_for_ru_mask(phone)
+        if not local10:
+            raise ValueError("bad phone for RU mask")
 
-        await page.wait_for_selector(phone_input_sel, state="visible", timeout=8000)
-        await page.fill(phone_input_sel, phone)
-        await page.wait_for_timeout(120)  # стабилизация маски телефона
-        btn = await page.query_selector(submit_phone_sel)
-        if btn:
-            await btn.click()
-        else:
+        await page.wait_for_selector(PHONE_INPUT_SEL, state="visible", timeout=8000)
+        # кликаем по инпуту, чтобы поставить курсор после '+7 '
+        input_el = await page.query_selector(PHONE_INPUT_SEL)
+        await input_el.click()
+        # возможно, поле уже содержит часть маски, чистим что могли набрать ранее
+        await input_el.fill("")  # заполнит только цифры части; '+7 ' часто не удаляется — это нормально
+        await page.keyboard.type(local10, delay=20)  # небольшая задержка для стабильности маски
+
+        # отправляем форму
+        try:
+            btn = await page.query_selector(SUBMIT_BTN_SEL)
+            if btn:
+                await btn.click()
+            else:
+                await page.keyboard.press("Enter")
+        except PWTimeoutError:
             await page.keyboard.press("Enter")
 
     async def fill_sms_code(self, tg_user_id: int, code: str):
         page = await self.get_page(tg_user_id)
+        # ждём появления формы ввода кода
+        try:
+            await page.wait_for_selector(SMS_CODE_INPUTS_SEL, state="attached", timeout=8000)
+        except PWTimeoutError:
+            # возможно, другой селектор — ждём любое поле ввода кода
+            await page.wait_for_selector("input", timeout=8000)
 
-        inputs = await page.query_selector_all(
-            "input[autocomplete='one-time-code'], input[name^='code'], input[type='tel']"
-        )
-        if inputs and len(code) >= len(inputs) >= 4:
-            for i, ch in enumerate(code[: len(inputs)]):
-                await inputs[i].fill(ch)
-        else:
-            code_sel = "input[name='code'], input[type='text'][maxlength='6'], input[type='tel']"
-            await page.wait_for_selector(code_sel, state="visible", timeout=8000)
-            await page.fill(code_sel, code)
+        await _fill_code_inputs(page, code)
         await page.keyboard.press("Enter")
 
     async def fill_email(self, tg_user_id: int, email: str):
         page = await self.get_page(tg_user_id)
-        email_sel = "input[type='email'], input[name='email']"
-        submit_sel = (
-            "button[type='submit'], button:has-text('Продолжить'), [data-qa='sendEmail']"
-        )
-        await page.wait_for_selector(email_sel, state="visible", timeout=8000)
-        await page.fill(email_sel, email)
-        btn = await page.query_selector(submit_sel)
+        await page.wait_for_selector(EMAIL_INPUT_SEL, state="visible", timeout=8000)
+        await page.fill(EMAIL_INPUT_SEL, email)
+        btn = await page.query_selector(SUBMIT_BTN_SEL)
         if btn:
             await btn.click()
         else:
             await page.keyboard.press("Enter")
 
     async def fill_email_code(self, tg_user_id: int, code: str):
-        # повторяем логику для СМС-кода
-        await self.fill_sms_code(tg_user_id, code)
-        await asyncio.sleep(0.6)  # короткая пауза на редирект/обновление
-        # после успешного шага — сохраняем storage_state пользователя
-        await self._save_state(tg_user_id)
+        page = await self.get_page(tg_user_id)
+        try:
+            await page.wait_for_selector(SMS_CODE_INPUTS_SEL, state="attached", timeout=8000)
+        except PWTimeoutError:
+            await page.wait_for_selector("input", timeout=8000)
+
+        await _fill_code_inputs(page, code)
+        await page.keyboard.press("Enter")
+        await asyncio.sleep(0.6)
+        await self._save_state(tg_user_id)  # сохраняем storage_state после успешного шага
 
     # ---------- Выход ----------
 
