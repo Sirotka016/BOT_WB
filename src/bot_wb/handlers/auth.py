@@ -1,3 +1,5 @@
+import re
+
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -35,11 +37,14 @@ async def on_auth(cb: CallbackQuery, state: FSMContext):
 
 @router.message(AuthFSM.waiting_phone)
 async def got_phone(m: Message, state: FSMContext):
-    phone = (m.text or "").strip()
-    if not (phone.startswith("+") and phone[1:].isdigit() and len(phone) >= 12):
+    phone_raw = (m.text or "").strip()
+    # простая проверка формата: +7XXXXXXXXXX / 8XXXXXXXXXX / XXXXXXXXXX
+    digits = re.sub(r"\D", "", phone_raw)
+    if not (len(digits) in (10, 11) and digits[-10:].isdigit()):
         await m.reply("Неверный формат. Пример: +79991234567")
         return
-    await _auth.submit_phone(m.from_user.id, phone)
+
+    await _auth.submit_phone(m.from_user.id, phone_raw)
     await m.answer(texts.ask_sms_code_text())
     await state.set_state(AuthFSM.waiting_sms_code)
 
