@@ -1,28 +1,43 @@
 from ..storage.repo import UserRepo
-from ..settings import settings
-from .wb_browser import WBBrowser
+from .wb_http_client import WBHttpClient
 
 
 class AuthService:
     def __init__(self, repo: UserRepo):
         self.repo = repo
-        self.browser = WBBrowser(settings.wb_partner_url)
 
-    async def is_authorized(self, tg_user_id: int) -> bool:
-        return await self.browser.is_logged_in(tg_user_id)
+    async def is_authorized(self, tg_id: int) -> bool:
+        return await self.repo.is_authorized(tg_id)
 
-    async def start_partner(self, tg_user_id: int):
-        await self.browser.open_partner(tg_user_id)
+    async def login_phone(self, tg_id: int, phone: str) -> bool:
+        client = WBHttpClient()
+        try:
+            ok = await client.start_phone(phone)
+            if ok:
+                await self.repo.upsert(tg_id, phone=phone)
+            return ok
+        finally:
+            await client.aclose()
 
-    async def submit_phone(self, tg_user_id: int, phone: str):
-        await self.browser.fill_phone(tg_user_id, phone)
+    async def login_sms(self, tg_id: int, phone: str, code: str) -> bool:
+        client = WBHttpClient()
+        try:
+            return await client.confirm_sms(phone, code)
+        finally:
+            await client.aclose()
 
-    async def submit_sms(self, tg_user_id: int, code: str):
-        await self.browser.fill_sms_code(tg_user_id, code)
+    async def login_email_code(self, tg_id: int, code: str) -> bool:
+        client = WBHttpClient()
+        try:
+            ok = await client.confirm_email_code(code)
+            if ok:
+                org = await client.get_profile_org()
+                await self.repo.set_authorized(tg_id, True)
+                if org:
+                    await self.repo.set_profile_org(tg_id, org)
+            return ok
+        finally:
+            await client.aclose()
 
-    async def submit_email_code(self, tg_user_id: int, code: str):
-        await self.browser.fill_email_code(tg_user_id, code)
-
-    async def logout(self, tg_user_id: int):
-        await self.browser.logout(tg_user_id)
-        await self.repo.clear_auth(tg_user_id)
+    async def logout(self, tg_id: int):
+        await self.repo.clear_auth(tg_id)
