@@ -28,7 +28,12 @@ async def _edit_anchor(bot: Bot, chat_id: int, text: str, markup: InlineKeyboard
     anchor = await repo.get_anchor(chat_id)
     if anchor:
         try:
-            await bot.edit_message_text(text, chat_id, anchor, reply_markup=markup)
+            await bot.edit_message_text(
+                text=text,
+                chat_id=chat_id,
+                message_id=anchor,
+                reply_markup=markup,
+            )
             return
         except Exception:
             pass
