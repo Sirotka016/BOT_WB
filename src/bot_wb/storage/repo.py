@@ -1,4 +1,5 @@
 import json
+
 import aiosqlite
 
 from .db import DB_PATH
@@ -11,7 +12,10 @@ class UserRepo:
     async def get(self, tg_user_id: int):
         async with aiosqlite.connect(self._db_path) as db:
             db.row_factory = aiosqlite.Row
-            cur = await db.execute("SELECT * FROM users WHERE tg_user_id=?", (tg_user_id,))
+            cur = await db.execute(
+                "SELECT * FROM users WHERE tg_user_id=?",
+                (tg_user_id,),
+            )
             row = await cur.fetchone()
             return dict(row) if row else None
 
@@ -20,11 +24,12 @@ class UserRepo:
             return
         keys = ", ".join(fields.keys())
         placeholders = ", ".join(["?"] * len(fields))
-        updates = ", ".join([f"{k}=excluded.{k}" for k in fields.keys()])
+        updates = ", ".join([f"{k}=excluded.{k}" for k in fields])
         values = list(fields.values())
         q = (
             f"INSERT INTO users (tg_user_id,{keys}) VALUES (?,{placeholders}) "
-            f"ON CONFLICT(tg_user_id) DO UPDATE SET {updates}, updated_at=CURRENT_TIMESTAMP"
+            "ON CONFLICT(tg_user_id) DO UPDATE "
+            f"SET {updates}, updated_at=CURRENT_TIMESTAMP"
         )
         async with aiosqlite.connect(self._db_path) as db:
             await db.execute(q, (tg_user_id, *values))
@@ -66,7 +71,10 @@ class UserRepo:
             await db.commit()
 
     async def set_profiles(self, tg_user_id: int, profiles: list[dict]):
-        await self.upsert(tg_user_id, profiles_json=json.dumps(profiles, ensure_ascii=False))
+        await self.upsert(
+            tg_user_id,
+            profiles_json=json.dumps(profiles, ensure_ascii=False),
+        )
 
     async def get_profiles(self, tg_user_id: int) -> list[dict]:
         u = await self.get(tg_user_id)
@@ -74,7 +82,7 @@ class UserRepo:
             return []
         try:
             return json.loads(u["profiles_json"])
-        except Exception:
+        except json.JSONDecodeError:
             return []
 
     async def set_active_profile(self, tg_user_id: int, profile_id: str):

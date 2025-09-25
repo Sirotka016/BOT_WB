@@ -1,7 +1,7 @@
-from pathlib import Path
+from bot_wb.logging import logger
+from bot_wb.storage.repo import UserRepo
+from bot_wb.storage.session import CookieStorage
 
-from ..storage.repo import UserRepo
-from ..storage.session import CookieStorage
 from .browser_login import BrowserLogin
 from .wb_http_client import WBHttpClient
 
@@ -11,11 +11,11 @@ class AuthService:
         self.repo = repo
 
     async def is_authorized(self, tg_id: int) -> bool:
-        sess = Path(f"data/sessions/{tg_id}/cookies.json")
-        if not sess.exists():
+        storage = CookieStorage(tg_id)
+        if not storage.cookies_path.exists():
             await self.repo.set_authorized(tg_id, False)
             return False
-        client = WBHttpClient(tg_id)
+        client = WBHttpClient(tg_id, storage=storage)
         try:
             ok = await client.is_logged_in()
             await self.repo.set_authorized(tg_id, ok)
@@ -24,9 +24,11 @@ class AuthService:
             await client.aclose()
 
     async def interactive_login(self, tg_id: int) -> bool:
+        logger.info("Starting interactive login for user {}", tg_id)
         async with BrowserLogin(tg_id) as bl:
             ok = await bl.run_flow(timeout_sec=420)
         if ok:
+            logger.info("Interactive login succeeded for user {}", tg_id)
             client = WBHttpClient(tg_id)
             try:
                 profiles = await client.list_organizations()
@@ -42,8 +44,12 @@ class AuthService:
                 await self.repo.set_authorized(tg_id, True)
             finally:
                 await client.aclose()
+        else:
+            logger.warning("Interactive login failed for user {}", tg_id)
+            await self.repo.set_authorized(tg_id, False)
         return ok
 
     async def logout(self, tg_id: int):
+        logger.info("Clearing session for user {}", tg_id)
         CookieStorage(tg_id).clear()
         await self.repo.clear_auth(tg_id)

@@ -1,19 +1,23 @@
+from __future__ import annotations
+
 from aiogram import F, Router
-from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import CallbackQuery
 
-from ..services.wb_http_client import WBHttpClient
-from ..storage.repo import UserRepo
-from ..ui import texts
-from ..ui.keyboards import kb_profile_switch, kb_profile_view
+from bot_wb.logging import logger
+from bot_wb.services.wb_http_client import WBHttpClient
+from bot_wb.storage.repo import UserRepo
+from bot_wb.ui import texts
+from bot_wb.ui.keyboards import kb_profile_switch, kb_profile_view
+
+from ._render import _edit_or_send, _replace_message
 
 router = Router(name=__name__)
 _repo = UserRepo()
 
 
-async def _render_profile(cb: CallbackQuery):
-    if not cb.message:
-        return
+async def _render_profile(cb: CallbackQuery, *, force_replace: bool = False) -> None:
+    if cb.bot is None:
+        raise RuntimeError("Callback does not contain bot instance")
     tg_id = cb.from_user.id
     profiles = await _repo.get_profiles(tg_id)
     if not profiles:
@@ -38,15 +42,14 @@ async def _render_profile(cb: CallbackQuery):
         text = texts.profile_text_multi(profiles, active_id)
         markup = kb_profile_view(has_multiple=True)
 
-    if cb.message:
-        try:
-            await cb.message.edit_text(text=text, reply_markup=markup)
-        except TelegramBadRequest as exc:
-            if "message is not modified" not in str(exc).lower():
-                raise
+    chat = getattr(cb.message, "chat", None)
+    chat_id = getattr(chat, "id", cb.from_user.id)
+    if force_replace:
+        await _replace_message(cb.bot, chat_id, text, markup)
     else:
-        return
+        await _edit_or_send(cb.bot, chat_id, text, markup)
     await _repo.set_view(tg_id, "profile")
+    logger.info("Rendered profile view for chat {}", chat_id)
 
 
 @router.callback_query(F.data == "profile")
@@ -57,7 +60,7 @@ async def on_profile(cb: CallbackQuery):
 
 @router.callback_query(F.data == "profile_refresh")
 async def on_profile_refresh(cb: CallbackQuery):
-    await _render_profile(cb)
+    await _render_profile(cb, force_replace=True)
     await cb.answer("Обновлено")
 
 
@@ -69,10 +72,11 @@ async def on_profile_switch(cb: CallbackQuery):
     if not profiles:
         await cb.answer("Профили не найдены", show_alert=True)
         return
-    if not cb.message:
+    message_obj = cb.message
+    if message_obj is None or not hasattr(message_obj, "edit_text"):
         await cb.answer()
         return
-    await cb.message.edit_text(
+    await message_obj.edit_text(
         text="Выберите профиль для работы:",
         reply_markup=kb_profile_switch(
             [(str(p.get("id") or ""), p.get("name") or "—") for p in profiles],
@@ -84,6 +88,9 @@ async def on_profile_switch(cb: CallbackQuery):
 
 @router.callback_query(F.data.startswith("set_profile:"))
 async def on_set_profile(cb: CallbackQuery):
+    if cb.data is None:
+        await cb.answer("Некорректные данные", show_alert=True)
+        return
     pid = cb.data.split(":", 1)[1]
     tg_id = cb.from_user.id
 
