@@ -12,7 +12,7 @@ pip install -e .
 cp .env.example .env
 # заполните BOT_TOKEN и другие переменные
 python -m playwright install chromium
-python -m bot_wb.main
+python -m bot_wb
 ```
 
 ## ▶️ Запуск
@@ -22,7 +22,7 @@ python -m bot_wb.main
 
 Способ B (рекомендуемый для разработки):
     pip install -e .
-    python -m bot_wb.main
+    python -m bot_wb
 
 ## ⚙️ Переменные окружения
 
