@@ -1,13 +1,19 @@
 import asyncio
+from urllib.parse import urlparse
 from typing import Any, Dict, Iterable
 
 from loguru import logger
 from playwright.async_api import Browser, BrowserContext, async_playwright
 
 from ..settings import settings
-from ..storage.session import CookieStorage
+from .wb_http_client import WBHttpClient
 
 WB_AUTH_DOMAINS = {"seller-auth.wildberries.ru", "seller.wildberries.ru"}
+
+IMPORTANT_COOKIES = {
+    "wbx-validation-key",
+    "wbx-refresh",
+}
 
 
 class BrowserLogin:
@@ -41,10 +47,10 @@ class BrowserLogin:
             if self._pw:
                 await self._pw.stop()
 
-    async def run_flow(self, timeout_sec: int = 300) -> bool:
+    async def run_flow(self, timeout_sec: int = 420) -> bool:
         """
-        Открывает страницу логина и ждёт, пока появится авторизованный кабинет (seller.wildberries.ru).
-        Возвращает True при успехе и сохраняет cookies в data/sessions/<tg_id>/cookies.json
+        Открывает страницу логина и ждёт реальную валидную сессию.
+        Успех фиксируется только после появления нужных cookie и успешной HTTP-проверки.
         """
 
         assert self._ctx is not None
@@ -54,21 +60,29 @@ class BrowserLogin:
         logger.info("WB auth window opened. User should complete login in the browser window.")
 
         deadline = asyncio.get_event_loop().time() + timeout_sec
-        success = False
+
+        async def collect_and_check() -> bool:
+            cookies = await self._ctx.cookies()
+            jar = self._pick_cookies(cookies, WB_AUTH_DOMAINS)
+            if not any(name in jar for name in IMPORTANT_COOKIES):
+                return False
+            client = WBHttpClient(self.tg_user_id)
+            try:
+                client.client.cookies.update(jar)
+                return await client.is_logged_in()
+            finally:
+                await client.aclose()
 
         while asyncio.get_event_loop().time() < deadline:
             url = page.url or ""
-            if "seller.wildberries.ru" in url:
+            host = urlparse(url).hostname or ""
+            if host.endswith("seller.wildberries.ru"):
                 await asyncio.sleep(1.0)
-                cookies = await self._ctx.cookies()
-                jar = self._pick_cookies(cookies, WB_AUTH_DOMAINS)
-                if jar:
-                    CookieStorage(self.tg_user_id).save(jar)
-                    success = True
-                    break
+                if await collect_and_check():
+                    return True
             await asyncio.sleep(1.0)
 
-        return success
+        return False
 
     def _pick_cookies(
         self,

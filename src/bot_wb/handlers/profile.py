@@ -1,4 +1,5 @@
 from aiogram import F, Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import CallbackQuery
 
 from ..services.wb_http_client import WBHttpClient
@@ -37,7 +38,14 @@ async def _render_profile(cb: CallbackQuery):
         text = texts.profile_text_multi(profiles, active_id)
         markup = kb_profile_view(has_multiple=True)
 
-    await cb.message.edit_text(text=text, reply_markup=markup)
+    if cb.message:
+        try:
+            await cb.message.edit_text(text=text, reply_markup=markup)
+        except TelegramBadRequest as exc:
+            if "message is not modified" not in str(exc).lower():
+                raise
+    else:
+        return
     await _repo.set_view(tg_id, "profile")
 
 

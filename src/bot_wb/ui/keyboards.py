@@ -1,20 +1,15 @@
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 
 def kb_home(authorized: bool) -> InlineKeyboardMarkup:
     row1 = []
     if authorized:
         row1.append(InlineKeyboardButton(text="👤 Профиль", callback_data="profile"))
-        # ВАЖНО: на главном больше ничего не добавляем, ты просил только Профиль/Домой/Закрыть (Домой = этот экран)
     else:
         row1.append(InlineKeyboardButton(text="🔑 Авторизация", callback_data="auth"))
-    # Домой = этот экран, отдельной кнопки не нужно — мы и так «дома»
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [*row1],
-            [InlineKeyboardButton(text="❌ Закрыть", callback_data="close")],
-        ]
-    )
+    row2 = [InlineKeyboardButton(text="🔄 Обновить", callback_data="refresh")]
+    row3 = [InlineKeyboardButton(text="❌ Закрыть", callback_data="close")]
+    return InlineKeyboardMarkup(inline_keyboard=[row1, row2, row3])
 
 
 def kb_auth_stub() -> InlineKeyboardMarkup:
@@ -30,7 +25,6 @@ def kb_auth_stub() -> InlineKeyboardMarkup:
 
 def kb_profile_view(has_multiple: bool) -> InlineKeyboardMarkup:
     rows = []
-    # В профиле должны быть кнопки: Сменить профиль, Выйти, Домой, Обновить, Закрыть
     if has_multiple:
         rows.append([InlineKeyboardButton(text="🔀 Сменить профиль", callback_data="profile_switch")])
     rows.append([InlineKeyboardButton(text="🚪 Выйти с аккаунта", callback_data="logout")])
