@@ -1,6 +1,5 @@
 import httpx
 from httpx import Cookies
-from loguru import logger
 
 from ..settings import settings
 from ..storage.session import CookieStorage
@@ -42,13 +41,19 @@ class WBHttpClient:
 
     async def is_logged_in(self) -> bool:
         try:
-            response = await self.client.get("")
-            self._persist()
-            return response.status_code == 200 and (
-                "<!DOCTYPE html" in response.text or "seller" in response.text.lower()
+            response = await self.client.get("", timeout=15)
+            if response.status_code != 200:
+                return False
+            body = response.text.lower()
+            ok = (
+                "seller" in body
+                or "wildberries" in body
+                or "<!doctype html" in body
             )
-        except Exception as exc:
-            logger.warning(f"is_logged_in error: {exc}")
+            if ok:
+                self._persist()
+            return ok
+        except Exception:
             return False
 
     async def get_organization_name(self) -> str | None:

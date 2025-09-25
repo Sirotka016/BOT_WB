@@ -17,24 +17,41 @@ _auth = AuthService(_repo)
 async def on_auth(cb: CallbackQuery, state: FSMContext):
     user_name = cb.from_user.full_name if cb.from_user else "друг"
 
-    await cb.message.edit_text(
-        "Открыл окно входа WB Seller.\n"
-        "Пожалуйста, авторизуйтесь в появившемся окне (телефон → SMS → код с e-mail).\n\n"
-        "После завершения здесь появится подтверждение.",
-        reply_markup=None,
-    )
+    if cb.message:
+        await cb.message.edit_text(
+            "Открыл окно входа WB Seller.\n"
+            "Пожалуйста, авторизуйтесь в появившемся окне (телефон → SMS → код с e-mail).\n\n"
+            "Окно закроется автоматически после успешного входа.",
+            reply_markup=None,
+        )
     await state.clear()
     await cb.answer()
 
     ok = await _auth.interactive_login(cb.from_user.id)
+    chat_id = cb.message.chat.id if cb.message else cb.from_user.id
 
     if ok:
-        await render_home(cb.bot, cb.message.chat.id, user_name)
+        await render_home(cb.bot, chat_id, user_name, force_replace=True)
     else:
-        await cb.message.edit_text(
-            "Не удалось завершить авторизацию. Попробуйте ещё раз: нажмите «Авторизация».",
-            reply_markup=kb_home(authorized=False),
-        )
+        if cb.message:
+            try:
+                await cb.message.edit_text(
+                    "Не удалось завершить авторизацию. Попробуйте ещё раз: нажмите «Авторизация».",
+                    reply_markup=kb_home(authorized=False),
+                )
+            except Exception:
+                msg = await cb.message.answer(
+                    "Не удалось завершить авторизацию. Попробуйте ещё раз: нажмите «Авторизация».",
+                    reply_markup=kb_home(authorized=False),
+                )
+                await _repo.set_anchor(cb.from_user.id, msg.message_id)
+        else:
+            msg = await cb.bot.send_message(
+                chat_id,
+                "Не удалось завершить авторизацию. Попробуйте ещё раз: нажмите «Авторизация».",
+                reply_markup=kb_home(authorized=False),
+            )
+            await _repo.set_anchor(cb.from_user.id, msg.message_id)
 
 
 @router.callback_query(F.data == "logout")
@@ -42,26 +59,8 @@ async def logout(cb: CallbackQuery, state: FSMContext):
     await _auth.logout(cb.from_user.id)
     await state.clear()
     user_name = cb.from_user.full_name if cb.from_user else "друг"
-    await render_home(cb.bot, cb.message.chat.id, user_name)
-    await cb.answer()
-
-
-@router.callback_query(F.data == "home")
-async def to_home(cb: CallbackQuery):
-    user_name = cb.from_user.full_name if cb.from_user else "друг"
-    await render_home(cb.bot, cb.message.chat.id, user_name)
-    await cb.answer()
-
-
-@router.callback_query(F.data == "refresh")
-async def refresh(cb: CallbackQuery):
-    view = await _repo.get_view(cb.from_user.id)
-    user_name = cb.from_user.full_name if cb.from_user else "друг"
-    if view == "profile":
-        await cb.answer("Используйте кнопку \"Обновить\" в профиле", show_alert=True)
-        return
-    else:
-        await render_home(cb.bot, cb.message.chat.id, user_name)
+    chat_id = cb.message.chat.id if cb.message else cb.from_user.id
+    await render_home(cb.bot, chat_id, user_name, force_replace=True)
     await cb.answer()
 
 
