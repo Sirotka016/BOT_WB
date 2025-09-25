@@ -27,10 +27,7 @@ async def ensure_db():
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(INIT_SQL)
         # миграции для уже существующих таблиц
-        cols = {
-            r[1]
-            for r in await (await db.execute("PRAGMA table_info(users)")).fetchall()
-        }
+        cols = {r[1] for r in await (await db.execute("PRAGMA table_info(users)")).fetchall()}
         for col, ddl in [
             ("profile_org", "ALTER TABLE users ADD COLUMN profile_org TEXT"),
             ("anchor_msg_id", "ALTER TABLE users ADD COLUMN anchor_msg_id INTEGER"),

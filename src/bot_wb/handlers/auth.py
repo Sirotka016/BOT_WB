@@ -50,8 +50,7 @@ async def on_auth(cb: CallbackQuery, state: FSMContext):
     else:
         logger.warning("Auth flow failed for user {}", cb.from_user.id)
         failure_text = (
-            "Не удалось завершить авторизацию. "
-            "Попробуйте ещё раз: нажмите «Авторизация»."
+            "Не удалось завершить авторизацию. " "Попробуйте ещё раз: нажмите «Авторизация»."
         )
         if message_obj and hasattr(message_obj, "edit_text"):
             try:
