@@ -6,7 +6,7 @@ from ..services.auth_service import AuthService
 from ..storage.repo import UserRepo
 from ..ui import texts
 from ..ui.keyboards import kb_home
-from ._render import render_home, render_profile
+from ._render import render_home
 
 router = Router(name=__name__)
 _repo = UserRepo()
@@ -37,12 +37,6 @@ async def on_auth(cb: CallbackQuery, state: FSMContext):
         )
 
 
-@router.callback_query(F.data == "profile")
-async def on_profile(cb: CallbackQuery):
-    await render_profile(cb.bot, cb.message.chat.id)
-    await cb.answer()
-
-
 @router.callback_query(F.data == "logout")
 async def logout(cb: CallbackQuery, state: FSMContext):
     await _auth.logout(cb.from_user.id)
@@ -64,7 +58,8 @@ async def refresh(cb: CallbackQuery):
     view = await _repo.get_view(cb.from_user.id)
     user_name = cb.from_user.full_name if cb.from_user else "друг"
     if view == "profile":
-        await render_profile(cb.bot, cb.message.chat.id)
+        await cb.answer("Используйте кнопку \"Обновить\" в профиле", show_alert=True)
+        return
     else:
         await render_home(cb.bot, cb.message.chat.id, user_name)
     await cb.answer()

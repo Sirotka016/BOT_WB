@@ -58,7 +58,8 @@ class UserRepo:
         async with aiosqlite.connect(self._db_path) as db:
             await db.execute(
                 "UPDATE users SET phone=NULL,email=NULL,cookies=NULL,api_token=NULL,"
-                "is_authorized=0,profile_org=NULL,current_view=NULL,updated_at=CURRENT_TIMESTAMP "
+                "is_authorized=0,profile_org=NULL,current_view=NULL,profiles_json=NULL,"
+                "active_profile_id=NULL,updated_at=CURRENT_TIMESTAMP "
                 "WHERE tg_user_id=?",
                 (tg_user_id,),
             )

@@ -6,6 +6,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.types import BotCommand
 
 from .handlers.auth import router as auth_router
+from .handlers.profile import router as profile_router
 from .handlers.start import router as start_router
 from .logger import logger
 from .settings import settings
@@ -32,7 +33,7 @@ async def main():
     await ensure_db()
     bot = Bot(token=settings.bot_token)
     dp = Dispatcher()
-    dp.include_routers(start_router, auth_router)
+    dp.include_routers(start_router, auth_router, profile_router)
 
     await setup_commands(bot)
     logger.info("BOT_WB started")

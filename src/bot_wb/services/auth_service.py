@@ -29,9 +29,16 @@ class AuthService:
         if ok:
             client = WBHttpClient(tg_id)
             try:
-                org = await client.get_organization_name()
-                if org:
-                    await self.repo.set_profile_org(tg_id, org)
+                profiles = await client.list_organizations()
+                await self.repo.set_profiles(tg_id, profiles)
+                if profiles:
+                    await self.repo.set_active_profile(tg_id, profiles[0]["id"])
+                    if profiles[0].get("name"):
+                        await self.repo.set_profile_org(tg_id, profiles[0]["name"])
+                else:
+                    org = await client.get_organization_name()
+                    if org:
+                        await self.repo.set_profile_org(tg_id, org)
                 await self.repo.set_authorized(tg_id, True)
             finally:
                 await client.aclose()
