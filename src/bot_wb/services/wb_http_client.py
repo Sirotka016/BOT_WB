@@ -60,3 +60,18 @@ class WBHttpClient:
         except Exception:
             pass
         return None
+
+    async def list_organizations(self) -> list[dict]:
+        """
+        TODO: заменить на реальное API WB Seller.
+        Пока возвращаем 1 профиль — имя из get_organization_name().
+        """
+        name = await self.get_organization_name()
+        return [{"id": "default", "name": name or "Аккаунт WB Seller", "inn": ""}]
+
+    async def set_active_organization(self, org_id: str) -> bool:
+        """
+        TODO: если у WB действительно есть переключение юрлиц в одном логине — тут вызвать их API.
+        Пока возвращаем True без запроса.
+        """
+        return True

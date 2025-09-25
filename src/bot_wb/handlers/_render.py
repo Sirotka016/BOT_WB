@@ -3,8 +3,8 @@ from aiogram.types import InlineKeyboardMarkup
 
 from ..services.auth_service import AuthService
 from ..storage.repo import UserRepo
-from ..ui.keyboards import kb_home, kb_profile
-from ..ui.texts import home_text, profile_text
+from ..ui.keyboards import kb_home
+from ..ui.texts import home_text
 
 repo = UserRepo()
 _auth = AuthService(repo)
@@ -16,14 +16,6 @@ async def render_home(bot: Bot, chat_id: int, user_name: str):
     markup: InlineKeyboardMarkup = kb_home(authorized)
     await _edit_anchor(bot, chat_id, text, markup)
     await repo.set_view(chat_id, "home")
-
-
-async def render_profile(bot: Bot, chat_id: int):
-    user = await repo.get(chat_id)
-    text = profile_text(user.get("profile_org") if user else None)
-    markup = kb_profile()
-    await _edit_anchor(bot, chat_id, text, markup)
-    await repo.set_view(chat_id, "profile")
 
 
 async def _edit_anchor(bot: Bot, chat_id: int, text: str, markup: InlineKeyboardMarkup | None):
