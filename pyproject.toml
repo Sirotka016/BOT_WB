@@ -1,18 +1,31 @@
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools>=69", "wheel"]
 build-backend = "setuptools.build_meta"
 
+[project]
+name = "bot-wb"
+version = "0.1.0"
+requires-python = ">=3.11"
+# dependencies: при необходимости синхронизируй с requirements.txt
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["bot_wb*"]
+
 [tool.black]
-line-length = 88
+line-length = 100
 target-version = ["py311"]
 
 [tool.isort]
 profile = "black"
-line_length = 88
+line_length = 100
 known_first_party = ["bot_wb"]
 
 [tool.ruff]
-line-length = 88
+line-length = 100
 src = ["src", "tests"]
 target-version = "py311"
 
@@ -50,7 +63,6 @@ show_error_codes = true
 
 [tool.pytest.ini_options]
 addopts = "-q"
-asyncio_mode = "auto"
 testpaths = ["tests"]
 
 [tool.coverage.run]

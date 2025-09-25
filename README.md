@@ -8,11 +8,21 @@
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements-dev.txt
+pip install -e .
 cp .env.example .env
 # заполните BOT_TOKEN и другие переменные
 python -m playwright install chromium
-PYTHONPATH=src python -m bot_wb.main
+python -m bot_wb.main
 ```
+
+## ▶️ Запуск
+
+Способ A (быстрый):
+    python main.py
+
+Способ B (рекомендуемый для разработки):
+    pip install -e .
+    python -m bot_wb.main
 
 ## ⚙️ Переменные окружения
 
