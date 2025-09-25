@@ -3,6 +3,7 @@ __pycache__/
 *.sqlite3
 *.db
 *.log
+.egg-info/
 .venv/
 .env
 .env.*
