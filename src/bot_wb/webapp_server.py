@@ -1,6 +1,7 @@
 import hashlib
 import hmac
 import urllib.parse
+from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Request
@@ -13,10 +14,17 @@ from .settings import settings
 from .storage.repo import UserRepo
 
 app = FastAPI()
-app.mount("/static", StaticFiles(directory="static"), name="static")
+
+BASE_DIR = Path.cwd()
+STATIC_DIR = BASE_DIR / "static"
+TEMPLATES_DIR = BASE_DIR / "templates"
+STATIC_DIR.mkdir(parents=True, exist_ok=True)
+TEMPLATES_DIR.mkdir(parents=True, exist_ok=True)
+
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 env = Environment(
-    loader=FileSystemLoader("templates"),
+    loader=FileSystemLoader(str(TEMPLATES_DIR)),
     autoescape=select_autoescape(["html", "xml"]),
 )
 
