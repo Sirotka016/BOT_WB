@@ -15,6 +15,10 @@ python -m playwright install chromium
 python -m bot_wb
 ```
 
+> Проект рассчитан на `aiogram` версии `3.7` и выше (до `4.0`).
+> Параметры `parse_mode`/`disable_web_page_preview`/`protect_content`
+> настраиваются через `DefaultBotProperties` при создании экземпляра `Bot`.
+
 ## ▶️ Запуск
 
 Способ A (быстрый):

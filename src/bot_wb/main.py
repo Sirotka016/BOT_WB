@@ -2,6 +2,8 @@ import asyncio
 from contextlib import suppress
 
 from aiogram import Bot, Dispatcher
+from aiogram.client.default import DefaultBotProperties
+from aiogram.enums import ParseMode
 from aiogram.types import BotCommand
 
 from .handlers.auth import router as auth_router
@@ -35,7 +37,10 @@ async def main() -> None:
     dp.include_routers(start_router, auth_router, profile_router)
     _setup_middlewares(dp)
 
-    bot = Bot(token=settings.bot_token, parse_mode="HTML")
+    bot = Bot(
+        token=settings.bot_token,
+        default=DefaultBotProperties(parse_mode=ParseMode.HTML),
+    )
 
     await setup_commands(bot)
     logger.info("BOT_WB started")

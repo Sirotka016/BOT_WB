@@ -7,6 +7,6 @@ pre-commit==4.0.1
 pytest==8.3.3
 pytest-asyncio==0.23.8
 respx==0.21.1
-aiohttp==3.10.10
+aiohttp==3.12.14
 aiogram-tests==1.0.3
 ruff==0.6.4
