@@ -5,10 +5,7 @@ try:
     from aiogram_tests.handler.internal import MockTelegramEvent
 except ModuleNotFoundError:  # pragma: no cover - aiogram-tests not v3-ready
     pytest.skip(
-        (
-            "aiogram-tests currently targets aiogram v2 "
-            "and is incompatible with aiogram v3"
-        ),
+        ("aiogram-tests currently targets aiogram v2 " "and is incompatible with aiogram v3"),
         allow_module_level=True,
     )
 

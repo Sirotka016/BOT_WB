@@ -119,8 +119,7 @@ async def test_render_profile_single(monkeypatch):
     assert bot.sent[0]["chat_id"] == CHAT_ID_SINGLE
     assert "Организация" in bot.sent[0]["text"]
     buttons = [
-        [button.text for button in row]
-        for row in bot.sent[0]["reply_markup"].inline_keyboard
+        [button.text for button in row] for row in bot.sent[0]["reply_markup"].inline_keyboard
     ]
     assert not any("🔀" in text for row in buttons for text in row)
 
@@ -153,8 +152,7 @@ async def test_render_profile_multi_force_replace(monkeypatch):
     assert repo._anchor != ANCHOR_ID
     assert bot.deleted[0]["message_id"] == ANCHOR_ID
     buttons = [
-        [button.text for button in row]
-        for row in bot.sent[0]["reply_markup"].inline_keyboard
+        [button.text for button in row] for row in bot.sent[0]["reply_markup"].inline_keyboard
     ]
     assert any("🔀" in text for row in buttons for text in row)
     assert repo.views[42] == "profile"

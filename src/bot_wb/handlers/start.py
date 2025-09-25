@@ -18,11 +18,7 @@ async def on_start(message: Message):
 @router.callback_query(F.data == "home")
 async def on_home(callback: CallbackQuery):
     user_name = callback.from_user.full_name if callback.from_user else "друг"
-    if (
-        callback.bot is None
-        or callback.message is None
-        or callback.message.chat is None
-    ):
+    if callback.bot is None or callback.message is None or callback.message.chat is None:
         raise RuntimeError("Callback does not contain required context")
     await render_home(callback.bot, callback.message.chat.id, user_name)
     await callback.answer()
@@ -31,11 +27,7 @@ async def on_home(callback: CallbackQuery):
 @router.callback_query(F.data == "refresh")
 async def on_refresh(callback: CallbackQuery):
     user_name = callback.from_user.full_name if callback.from_user else "друг"
-    if (
-        callback.bot is None
-        or callback.message is None
-        or callback.message.chat is None
-    ):
+    if callback.bot is None or callback.message is None or callback.message.chat is None:
         raise RuntimeError("Callback does not contain required context")
     await render_home(
         callback.bot,

@@ -29,9 +29,7 @@ class ErrorMiddleware(BaseMiddleware):
             return None
 
     async def _notify(self, event: TelegramObject) -> None:
-        message_text = (
-            "⚠️ Произошла ошибка. Попробуйте выполнить действие ещё раз позже."
-        )
+        message_text = "⚠️ Произошла ошибка. Попробуйте выполнить действие ещё раз позже."
         if isinstance(event, CallbackQuery):
             if event.message:
                 await event.message.answer(message_text)
