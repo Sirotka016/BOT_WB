@@ -11,6 +11,5 @@ if str(SRC) not in sys.path:
 
 from bot_wb.main import main  # noqa: E402
 
-
 if __name__ == "__main__":
     asyncio.run(main())
