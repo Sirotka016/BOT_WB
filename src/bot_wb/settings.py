@@ -15,6 +15,9 @@ class Settings:
         "WB_SELLER_AUTH_URL",
         "https://seller-auth.wildberries.ru/ru/?redirect_url=https%3A%2F%2Fseller.wildberries.ru%2F",
     )
+    webapp_host: str = os.getenv("WEBAPP_HOST", "0.0.0.0")
+    webapp_port: int = int(os.getenv("WEBAPP_PORT", "8080"))
+    webapp_public_url: str = os.getenv("WEBAPP_PUBLIC_URL", "http://localhost:8080")
 
 
 def _build_settings() -> Settings:

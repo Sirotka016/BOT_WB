@@ -1,3 +1,4 @@
+import json
 import aiosqlite
 
 from .db import DB_PATH
@@ -62,3 +63,22 @@ class UserRepo:
                 (tg_user_id,),
             )
             await db.commit()
+
+    async def set_profiles(self, tg_user_id: int, profiles: list[dict]):
+        await self.upsert(tg_user_id, profiles_json=json.dumps(profiles, ensure_ascii=False))
+
+    async def get_profiles(self, tg_user_id: int) -> list[dict]:
+        u = await self.get(tg_user_id)
+        if not u or not u.get("profiles_json"):
+            return []
+        try:
+            return json.loads(u["profiles_json"])
+        except Exception:
+            return []
+
+    async def set_active_profile(self, tg_user_id: int, profile_id: str):
+        await self.upsert(tg_user_id, active_profile_id=profile_id)
+
+    async def get_active_profile(self, tg_user_id: int) -> str | None:
+        u = await self.get(tg_user_id)
+        return u.get("active_profile_id") if u else None

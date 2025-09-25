@@ -31,6 +31,8 @@ async def ensure_db():
             ("anchor_msg_id", "ALTER TABLE users ADD COLUMN anchor_msg_id INTEGER"),
             ("current_view", "ALTER TABLE users ADD COLUMN current_view TEXT"),
             ("api_token", "ALTER TABLE users ADD COLUMN api_token TEXT"),
+            ("profiles_json", "ALTER TABLE users ADD COLUMN profiles_json TEXT"),
+            ("active_profile_id", "ALTER TABLE users ADD COLUMN active_profile_id TEXT"),
         ]:
             if col not in cols:
                 await db.execute(ddl)
