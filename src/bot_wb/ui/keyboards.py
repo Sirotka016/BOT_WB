@@ -1,10 +1,17 @@
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+
+from ..settings import settings
 
 
 def kb_home(authorized: bool) -> InlineKeyboardMarkup:
     row1 = []
     if authorized:
-        row1.append(InlineKeyboardButton(text="👤 Профиль", callback_data="profile"))
+        row1.append(
+            InlineKeyboardButton(
+                text="👤 Профиль",
+                web_app=WebAppInfo(url=f"{settings.webapp_public_url}/app/profile"),
+            )
+        )
     else:
         row1.append(InlineKeyboardButton(text="🔑 Авторизация", callback_data="auth"))
     row1.append(InlineKeyboardButton(text="🔄 Обновить", callback_data="refresh"))
