@@ -1,0 +1,58 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.black]
+line-length = 88
+target-version = ["py311"]
+
+[tool.isort]
+profile = "black"
+line_length = 88
+known_first_party = ["bot_wb"]
+
+[tool.ruff]
+line-length = 88
+src = ["src", "tests"]
+target-version = "py311"
+
+[tool.ruff.lint]
+select = [
+  "E",
+  "F",
+  "I",
+  "B",
+  "UP",
+  "ASYNC",
+  "BLE",
+  "COM",
+  "PIE",
+  "PT",
+  "RET",
+  "SIM",
+  "TID",
+  "PL",
+]
+ignore = [
+  "D",
+  "ANN101",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_unused_configs = true
+ignore_missing_imports = true
+pretty = true
+show_error_codes = true
+
+[tool.pytest.ini_options]
+addopts = "-q"
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["bot_wb"]

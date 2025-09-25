@@ -1,0 +1,41 @@
+name: lint & test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+      - name: Ruff
+        run: |
+          source .venv/bin/activate
+          ruff check src tests
+      - name: Black
+        run: |
+          source .venv/bin/activate
+          black --check src tests
+      - name: isort
+        run: |
+          source .venv/bin/activate
+          isort --check-only src tests
+      - name: mypy
+        run: |
+          source .venv/bin/activate
+          mypy src
+      - name: Pytest
+        run: |
+          source .venv/bin/activate
+          pytest
