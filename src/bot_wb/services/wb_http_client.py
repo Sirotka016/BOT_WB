@@ -1,75 +1,62 @@
 import httpx
 from httpx import Cookies
 from loguru import logger
-from typing import Any, Dict
+
+from ..settings import settings
+from ..storage.session import CookieStorage
 
 DEFAULT_HEADERS = {
     "Accept": "application/json, text/plain, */*",
-    "User-Agent": "Mozilla/5.0 BOT_WB/1.0",
+    "User-Agent": "BOT_WB/1.0 (+tg-bot)",
+    "Origin": settings.wb_seller_base,
+    "Referer": settings.wb_seller_base + "/",
 }
 
 
 class WBHttpClient:
     """
-    HTTP-клиент WB Seller.
-    Здесь НЕ раскрыты закрытые эндпоинты: помечены как TODO.
-    Мы обеспечиваем скорость за счёт постоянной сессии (cookies) и httpx.
+    Быстрые HTTP-запросы к WB после ручной авторизации в браузере.
+    Куки подтягиваем из data/sessions/<tg_id>/cookies.json
     """
 
-    def __init__(self, base_url: str, cookies: Dict[str, Any] | None = None):
+    def __init__(self, tg_user_id: int):
+        self.tg_user_id = tg_user_id
+        store = CookieStorage(tg_user_id)
         jar = Cookies()
-        for k, v in (cookies or {}).items():
+        for k, v in (store.load() or {}).items():
             jar.set(k, v)
         self.client = httpx.AsyncClient(
-            base_url=base_url.rstrip("/") + "/",
-            headers=DEFAULT_HEADERS,
-            timeout=20,
+            base_url=settings.wb_seller_base.rstrip("/") + "/",
+            headers=DEFAULT_HEADERS.copy(),
             cookies=jar,
             follow_redirects=True,
+            timeout=25,
         )
+        self._store = store
 
     async def aclose(self):
         await self.client.aclose()
 
-    def export_cookies(self) -> Dict[str, Any]:
-        # httpx.Cookies → dict
-        return {c.name: c.value for c in self.client.cookies.jar}
+    def _persist(self):
+        self._store.save({c.name: c.value for c in self.client.cookies.jar})
 
-    # ------------------- AUTH FLOW (заполни TODO) -------------------
+    async def is_logged_in(self) -> bool:
+        try:
+            response = await self.client.get("")
+            self._persist()
+            return response.status_code == 200 and (
+                "<!DOCTYPE html" in response.text or "seller" in response.text.lower()
+            )
+        except Exception as exc:
+            logger.warning(f"is_logged_in error: {exc}")
+            return False
 
-    async def start_phone(self, phone_e164: str) -> bool:
-        """
-        Шаг 1: отправить телефон, чтобы сервер отправил СМС.
-        TODO: подставить реальный URL/тело запроса/проверку ответа.
-        """
-        logger.info(f"[WB] start_phone {phone_e164=}")
-        # resp = await self.client.post("auth/phone", json={"phone": phone_e164})
-        # return resp.status_code == 200 and resp.json().get("ok")
-        return True
-
-    async def confirm_sms(self, phone_e164: str, code: str) -> bool:
-        """
-        Шаг 2: подтвердить код из СМС. Сервер может выдать промежуточные cookies.
-        """
-        logger.info(f"[WB] confirm_sms phone=**** code=****")
-        # resp = await self.client.post("auth/phone/confirm", json={"phone": phone_e164, "code": code})
-        # return resp.status_code == 200 and resp.json().get("ok")
-        return True
-
-    async def confirm_email_code(self, code: str) -> bool:
-        """
-        Шаг 3: подтвердить код из e-mail и завершить вход.
-        """
-        logger.info(f"[WB] confirm_email_code code=****")
-        # resp = await self.client.post("auth/email/confirm", json={"code": code})
-        # return resp.status_code == 200 and resp.json().get("ok")
-        return True
-
-    async def get_profile_org(self) -> str | None:
-        """
-        Прочитать «Организацию» из ЛК (после входа).
-        """
-        logger.info("[WB] get_profile_org")
-        # r = await self.client.get("profile")
-        # return r.json().get("organizationName")
-        return "ООО «Пример»"
+    async def get_organization_name(self) -> str | None:
+        try:
+            response = await self.client.get("")
+            self._persist()
+            if response.status_code == 200:
+                return "Аккаунт WB Seller"
+        except Exception:
+            pass
+        return None

@@ -1,15 +1,17 @@
 from aiogram import Bot
 from aiogram.types import InlineKeyboardMarkup
 
+from ..services.auth_service import AuthService
 from ..storage.repo import UserRepo
 from ..ui.keyboards import kb_home, kb_profile
 from ..ui.texts import home_text, profile_text
 
 repo = UserRepo()
+_auth = AuthService(repo)
 
 
 async def render_home(bot: Bot, chat_id: int, user_name: str):
-    authorized = await repo.is_authorized(chat_id)
+    authorized = await _auth.is_authorized(chat_id)
     text = home_text(user_name, authorized)
     markup: InlineKeyboardMarkup = kb_home(authorized)
     await _edit_anchor(bot, chat_id, text, markup)

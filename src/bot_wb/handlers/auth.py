@@ -1,15 +1,11 @@
-import re
-from typing import Optional
-
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
-from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery
 
 from ..services.auth_service import AuthService
 from ..storage.repo import UserRepo
 from ..ui import texts
-from ..ui.keyboards import kb_auth_stub
+from ..ui.keyboards import kb_home
 from ._render import render_home, render_profile
 
 router = Router(name=__name__)
@@ -17,107 +13,34 @@ _repo = UserRepo()
 _auth = AuthService(_repo)
 
 
-async def _anchor_id(user_id: int, repo) -> Optional[int]:
-    u = await repo.get(user_id)
-    return (u or {}).get("anchor_msg_id")
-
-
-class AuthFSM(StatesGroup):
-    waiting_phone = State()
-    waiting_sms_code = State()
-    waiting_email_code = State()
-
-
 @router.callback_query(F.data == "auth")
 async def on_auth(cb: CallbackQuery, state: FSMContext):
-    await _repo.set_view(cb.from_user.id, "auth_phone")
-    await cb.message.edit_text(texts.ask_phone_text(), reply_markup=kb_auth_stub())
-    await state.set_state(AuthFSM.waiting_phone)
+    user_name = cb.from_user.full_name if cb.from_user else "друг"
+
+    await cb.message.edit_text(
+        "Открыл окно входа WB Seller.\n"
+        "Пожалуйста, авторизуйтесь в появившемся окне (телефон → SMS → код с e-mail).\n\n"
+        "После завершения здесь появится подтверждение.",
+        reply_markup=None,
+    )
+    await state.clear()
     await cb.answer()
+
+    ok = await _auth.interactive_login(cb.from_user.id)
+
+    if ok:
+        await render_home(cb.bot, cb.message.chat.id, user_name)
+    else:
+        await cb.message.edit_text(
+            "Не удалось завершить авторизацию. Попробуйте ещё раз: нажмите «Авторизация».",
+            reply_markup=kb_home(authorized=False),
+        )
 
 
 @router.callback_query(F.data == "profile")
 async def on_profile(cb: CallbackQuery):
     await render_profile(cb.bot, cb.message.chat.id)
     await cb.answer()
-
-
-@router.message(AuthFSM.waiting_phone)
-async def got_phone(message: Message, state: FSMContext):
-    phone_raw = (message.text or "").strip()
-    digits = re.sub(r"\D", "", phone_raw)
-    anchor = await _anchor_id(message.from_user.id, _repo)
-    target_message_id = anchor or message.message_id
-    if not (len(digits) in (10, 11) and digits[-10:].isdigit()):
-        await message.bot.edit_message_text(
-            text="Неверный формат. Пример: +79991234567",
-            chat_id=message.chat.id,
-            message_id=target_message_id,
-        )
-        return
-    ok = await _auth.login_phone(message.from_user.id, phone_raw)
-    text = texts.ask_sms_code_text() if ok else "Не удалось отправить код. Попробуйте позже."
-    await _repo.set_view(message.from_user.id, "auth_sms")
-    await message.bot.edit_message_text(
-        text=text,
-        chat_id=message.chat.id,
-        message_id=target_message_id,
-        reply_markup=kb_auth_stub(),
-    )
-    if ok:
-        await state.set_state(AuthFSM.waiting_sms_code)
-
-
-@router.message(AuthFSM.waiting_sms_code)
-async def got_sms(message: Message, state: FSMContext):
-    code = (message.text or "").strip()
-    anchor = await _anchor_id(message.from_user.id, _repo)
-    target_message_id = anchor or message.message_id
-    if not code.isdigit():
-        await message.bot.edit_message_text(
-            text="Код должен содержать только цифры.",
-            chat_id=message.chat.id,
-            message_id=target_message_id,
-        )
-        return
-    user = await _repo.get(message.from_user.id)
-    ok = await _auth.login_sms(message.from_user.id, (user or {}).get("phone", ""), code)
-    text = texts.ask_email_code_text() if ok else "Неверный код или ошибка. Попробуйте снова."
-    await _repo.set_view(message.from_user.id, "auth_email_code" if ok else "auth_sms")
-    await message.bot.edit_message_text(
-        text=text,
-        chat_id=message.chat.id,
-        message_id=target_message_id,
-        reply_markup=kb_auth_stub(),
-    )
-    if ok:
-        await state.set_state(AuthFSM.waiting_email_code)
-
-
-@router.message(AuthFSM.waiting_email_code)
-async def got_email_code(message: Message, state: FSMContext):
-    code = (message.text or "").strip()
-    anchor = await _anchor_id(message.from_user.id, _repo)
-    target_message_id = anchor or message.message_id
-    if not code:
-        await message.bot.edit_message_text(
-            text="Введите код с e-mail.",
-            chat_id=message.chat.id,
-            message_id=target_message_id,
-        )
-        return
-    ok = await _auth.login_email_code(message.from_user.id, code)
-    if ok:
-        await state.clear()
-        await _repo.set_view(message.from_user.id, "home")
-        user_name = message.from_user.full_name if message.from_user else "друг"
-        await render_home(message.bot, message.chat.id, user_name)
-    else:
-        await message.bot.edit_message_text(
-            text="Код с e-mail не подошёл. Попробуйте снова.",
-            chat_id=message.chat.id,
-            message_id=target_message_id,
-        )
 
 
 @router.callback_query(F.data == "logout")
@@ -151,8 +74,8 @@ async def refresh(cb: CallbackQuery):
 async def close(cb: CallbackQuery, state: FSMContext):
     await state.clear()
     await _repo.set_view(cb.from_user.id, None)
-    anchor = await _anchor_id(cb.from_user.id, _repo)
-    text = "Сессия завершена. Нажмите /start для новой сессии."
+    anchor = await _repo.get_anchor(cb.from_user.id)
+    text = texts.logout_done_text()
     if anchor:
         await cb.bot.edit_message_text(
             text=text,
