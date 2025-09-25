@@ -3,4 +3,5 @@
   <component name="Black">
     <option name="sdkName" value="Python 3.13 (BOT_WB)" />
   </component>
+  <component name="ProjectRootManager" version="2" project-jdk-name="Python 3.13 (BOT_WB)" project-jdk-type="Python SDK" />
 </project>
