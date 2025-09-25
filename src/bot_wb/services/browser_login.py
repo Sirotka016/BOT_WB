@@ -1,0 +1,87 @@
+import asyncio
+from typing import Any, Dict, Iterable
+
+from loguru import logger
+from playwright.async_api import Browser, BrowserContext, async_playwright
+
+from ..settings import settings
+from ..storage.session import CookieStorage
+
+WB_AUTH_DOMAINS = {"seller-auth.wildberries.ru", "seller.wildberries.ru"}
+
+
+class BrowserLogin:
+    """
+    Открывает реальное окно авторизации WB Seller. Пользователь проходит вход вручную.
+    После редиректа/успешного входа — сохраняем куки для доменов WB_AUTH_DOMAINS.
+    """
+
+    def __init__(self, tg_user_id: int):
+        self.tg_user_id = tg_user_id
+        self._pw = None
+        self._browser: Browser | None = None
+        self._ctx: BrowserContext | None = None
+
+    async def __aenter__(self):
+        self._pw = await async_playwright().start()
+        self._browser = await self._pw.chromium.launch(
+            headless=False,
+            args=["--no-sandbox", "--disable-dev-shm-usage"],
+        )
+        self._ctx = await self._browser.new_context(viewport={"width": 1280, "height": 860})
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        try:
+            if self._ctx:
+                await self._ctx.close()
+        finally:
+            if self._browser:
+                await self._browser.close()
+            if self._pw:
+                await self._pw.stop()
+
+    async def run_flow(self, timeout_sec: int = 300) -> bool:
+        """
+        Открывает страницу логина и ждёт, пока появится авторизованный кабинет (seller.wildberries.ru).
+        Возвращает True при успехе и сохраняет cookies в data/sessions/<tg_id>/cookies.json
+        """
+
+        assert self._ctx is not None
+        page = await self._ctx.new_page()
+        await page.goto(settings.wb_seller_auth_url, wait_until="domcontentloaded")
+
+        logger.info("WB auth window opened. User should complete login in the browser window.")
+
+        deadline = asyncio.get_event_loop().time() + timeout_sec
+        success = False
+
+        while asyncio.get_event_loop().time() < deadline:
+            url = page.url or ""
+            if "seller.wildberries.ru" in url:
+                await asyncio.sleep(1.0)
+                cookies = await self._ctx.cookies()
+                jar = self._pick_cookies(cookies, WB_AUTH_DOMAINS)
+                if jar:
+                    CookieStorage(self.tg_user_id).save(jar)
+                    success = True
+                    break
+            await asyncio.sleep(1.0)
+
+        return success
+
+    def _pick_cookies(
+        self,
+        cookies: Iterable[Dict[str, Any]],
+        allowed_domains: set[str],
+    ) -> Dict[str, str]:
+        jar: Dict[str, str] = {}
+        for c in cookies:
+            domain = (c.get("domain") or "").lstrip(".")
+            name = c.get("name")
+            value = c.get("value")
+            if not name or value is None:
+                continue
+            if any(domain.endswith(d) for d in allowed_domains):
+                jar[name] = value
+        return jar

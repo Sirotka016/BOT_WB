@@ -2,7 +2,8 @@ from pathlib import Path
 
 from ..storage.repo import UserRepo
 from ..storage.session import CookieStorage
-from ..wb import WBSeller
+from .browser_login import BrowserLogin
+from .wb_http_client import WBHttpClient
 
 
 class AuthService:
@@ -10,39 +11,31 @@ class AuthService:
         self.repo = repo
 
     async def is_authorized(self, tg_id: int) -> bool:
-        u = await self.repo.get(tg_id)
-        sess_file = Path(f"data/sessions/{tg_id}/cookies.json")
-        return bool(u and u.get("is_authorized") and sess_file.exists())
-
-    async def login_phone(self, tg_id: int, phone: str) -> bool:
-        wb = WBSeller(tg_id)
+        sess = Path(f"data/sessions/{tg_id}/cookies.json")
+        if not sess.exists():
+            await self.repo.set_authorized(tg_id, False)
+            return False
+        client = WBHttpClient(tg_id)
         try:
-            ok = await wb.auth.start_phone(phone)
-            if ok:
-                await self.repo.upsert(tg_id, phone=phone)
+            ok = await client.is_logged_in()
+            await self.repo.set_authorized(tg_id, ok)
             return ok
         finally:
-            await wb.aclose()
+            await client.aclose()
 
-    async def login_sms(self, tg_id: int, phone: str, code: str) -> bool:
-        wb = WBSeller(tg_id)
-        try:
-            return await wb.auth.confirm_sms(phone, code)
-        finally:
-            await wb.aclose()
-
-    async def login_email_code(self, tg_id: int, code: str) -> bool:
-        wb = WBSeller(tg_id)
-        try:
-            ok = await wb.auth.confirm_email_code(code)
-            if ok:
-                org = await wb.profile.organization()
+    async def interactive_login(self, tg_id: int) -> bool:
+        async with BrowserLogin(tg_id) as bl:
+            ok = await bl.run_flow(timeout_sec=420)
+        if ok:
+            client = WBHttpClient(tg_id)
+            try:
+                org = await client.get_organization_name()
                 if org:
-                    await self.repo.set_profile_org(tg_id, org["name"])
+                    await self.repo.set_profile_org(tg_id, org)
                 await self.repo.set_authorized(tg_id, True)
-            return ok
-        finally:
-            await wb.aclose()
+            finally:
+                await client.aclose()
+        return ok
 
     async def logout(self, tg_id: int):
         CookieStorage(tg_id).clear()
