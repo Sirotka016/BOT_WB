@@ -1,10 +1,12 @@
 import asyncio
 from contextlib import suppress
+from pathlib import Path
 
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.types import BotCommand
+from filelock import FileLock, Timeout
 
 from .handlers.auth import router as auth_router
 from .handlers.profile import router as profile_router
@@ -33,22 +35,48 @@ async def main() -> None:
     logger.info("Bootstrapping BOT_WB")
     await ensure_db()
 
-    dp = Dispatcher()
-    dp.include_routers(start_router, auth_router, profile_router)
-    _setup_middlewares(dp)
-
     bot = Bot(
         token=settings.bot_token,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
 
+    dp = Dispatcher()
+    dp.include_routers(start_router, auth_router, profile_router)
+    _setup_middlewares(dp)
+
     await setup_commands(bot)
-    logger.info("BOT_WB started")
+
+    lock_path = Path(getattr(settings, "data_dir", Path("data"))) / "bot_wb.lock"
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    lock = FileLock(str(lock_path))
+
     try:
+        lock.acquire(timeout=0)
+    except Timeout:
+        logger.error(
+            "Another BOT_WB instance is already running (lock: %s). Exit.",
+            lock_path,
+        )
+        with suppress(Exception):
+            await bot.session.close()
+        return
+
+    try:
+        webhook_info = await bot.get_webhook_info()
+        if webhook_info.url:
+            logger.warning(
+                "Webhook is set to %s — deleting before long polling...",
+                webhook_info.url,
+            )
+            await bot.delete_webhook(drop_pending_updates=True)
+
+        logger.info("BOT_WB started")
         await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
     finally:
         with suppress(Exception):
             await bot.session.close()
+        with suppress(Exception):
+            lock.release()
         logger.info("BOT_WB shutdown complete")
 
 
