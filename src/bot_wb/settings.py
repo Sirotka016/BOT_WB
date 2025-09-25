@@ -7,7 +7,7 @@ load_dotenv()
 
 @dataclass(frozen=True)
 class Settings:
-    bot_token: str = os.getenv("BOT_TOKEN", "")
+    bot_token: str = os.getenv("BOT_TOKEN") or os.getenv("TELEGRAM_BOT_TOKEN", "")
     wb_base_url: str = os.getenv("WB_BASE_URL", "https://example.wb-partner.ru")
     wb_partner_url: str = os.getenv("WB_PARTNER_URL", "https://seller.wildberries.ru/")
     wb_seller_base: str = os.getenv("WB_SELLER_BASE", "https://seller.wildberries.ru")
